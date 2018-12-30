@@ -1,24 +1,14 @@
-extern crate gtk;
-extern crate gio;
-extern crate gdk;
-extern crate gdk_pixbuf;
-
 use gtk::prelude::*;
-use gtk::{
-    WindowExt, WidgetExt,
-    TextViewExt, TextBufferExt,
-};
+use gtk::{GtkWindowExt, TextBufferExt, TextViewExt, WidgetExt};
 
-use gio::{
-    SimpleActionExt, ActionMapExt
-};
+use gio::{ActionMapExt, SimpleActionExt};
 
-use std::path::Path;
-use std::ops::Deref;
 use std::cell::RefCell;
+use std::ops::Deref;
+use std::path::Path;
 use std::rc::Rc;
-use page::{Page, Pages, PageExtend, PagesExtend};
 
+use super::page::{Page, PageExtend, Pages, PagesExtend};
 
 pub struct WindowCore {
     win: gtk::ApplicationWindow,
@@ -26,7 +16,6 @@ pub struct WindowCore {
     pages: Pages,
     active_page: Option<Page>,
 }
-
 
 pub type Window = Rc<RefCell<WindowCore>>;
 
@@ -52,7 +41,7 @@ pub trait WindowExtend {
 
 impl WindowExtend for Window {
     fn create(app: &gtk::Application, wins: Windows) -> Window {
-        let builder = gtk::Builder::new_from_file(Path::new("/usr/share/vanilla_text/ui/window.ui"));
+        let builder = gtk::Builder::new_from_file(Path::new("ui/window.ui"));
         let window: gtk::ApplicationWindow = builder.get_object("window").unwrap();
         window.set_application(Some(app));
 
@@ -60,14 +49,12 @@ impl WindowExtend for Window {
 
         let pages = Pages::create();
 
-
-        let win = Rc::new(RefCell::new(
-                WindowCore {
-                    win: window.clone(),
-                    notebook: notebook.clone(),
-                    pages: pages.clone(),
-                    active_page: None
-                }));
+        let win = Rc::new(RefCell::new(WindowCore {
+            win: window.clone(),
+            notebook: notebook.clone(),
+            pages: pages.clone(),
+            active_page: None,
+        }));
 
         win.create_new_page(wins.clone());
 
@@ -82,8 +69,11 @@ impl WindowExtend for Window {
                 let len = pages.len();
                 if len > 0 {
                     let i;
-                    if n as usize == len { i = n - 1; }
-                    else { i = n; }
+                    if n as usize == len {
+                        i = n - 1;
+                    } else {
+                        i = n;
+                    }
 
                     let p = pages.borrow()[i as usize].clone();
                     if let Some(s) = p.tab_label().get_text() {
@@ -148,7 +138,9 @@ impl WindowExtend for Window {
             let win = self.clone();
             let wins = wins.clone();
             save_action.connect_activate(move |_, _| {
-                win.get_active_page().unwrap().save_file(wins.clone(), win.clone());
+                win.get_active_page()
+                    .unwrap()
+                    .save_file(wins.clone(), win.clone());
             });
         }
 
@@ -157,7 +149,9 @@ impl WindowExtend for Window {
             let win = self.clone();
             let wins = wins.clone();
             saveas_action.connect_activate(move |_, _| {
-                win.get_active_page().unwrap().save_as(wins.clone(), win.clone());
+                win.get_active_page()
+                    .unwrap()
+                    .save_as(wins.clone(), win.clone());
             });
         }
 
@@ -192,7 +186,7 @@ impl WindowExtend for Window {
                 buf.select_range(&start, &end);
             });
         }
-        
+
         let copy_action = gio::SimpleAction::new("copy", None);
         {
             let win = self.clone();
@@ -245,7 +239,7 @@ impl WindowExtend for Window {
 
         let open_action = gio::SimpleAction::new("open", None);
         {
-            use win::run_file_chooser_dialog;
+            use super::win::run_file_chooser_dialog;
             let wins = wins.clone();
             let win = self.clone();
             open_action.connect_activate(move |_, _| {
@@ -282,7 +276,6 @@ impl WindowExtend for Window {
         w.add_action(&about_action);
     }
 
-
     fn register(&self, wins: Windows) {
         wins.borrow_mut().push(self.clone());
     }
@@ -295,7 +288,6 @@ impl WindowExtend for Window {
         return None;
     }
 
-
     fn present(&self, page: Page) {
         let notebook = self.notebook();
         let n = notebook.page_num(&page.contents());
@@ -306,7 +298,6 @@ impl WindowExtend for Window {
     fn init(&self) {
         self.borrow().win.show_all();
     }
-
 
     fn win(&self) -> gtk::ApplicationWindow {
         self.borrow().win.clone()
@@ -333,7 +324,9 @@ impl WindowExtend for Window {
         }
 
         page.load_file(file);
-        if warning { page.show_warning(); }
+        if warning {
+            page.show_warning();
+        }
         let n = self.notebook().page_num(&page.contents());
         self.notebook().set_current_page(n);
         self.win().set_title(&page.tab_label().get_text().unwrap());
@@ -358,7 +351,7 @@ impl WindowExtend for Window {
         if let Some(i) = self.notebook().get_current_page() {
             let pages = self.pages();
             let ref page = pages.borrow()[i as usize];
-            return Some(page.clone())
+            return Some(page.clone());
         }
         None
     }
@@ -373,7 +366,9 @@ impl WindowExtend for Window {
         dialog.set_transient_for(&self.win());
         dialog.set_program_name("Vanilla Text");
 
-        let logo = gdk_pixbuf::Pixbuf::new_from_file("/usr/share/icons/hicolor/128x128/apps/vanilla_text.png");
+        let logo = gdk_pixbuf::Pixbuf::new_from_file(
+            "assets/logo.png",
+        );
         if let Ok(logo) = logo {
             dialog.set_logo(Some(&logo));
         }
@@ -404,9 +399,11 @@ impl WindowsExtend for Windows {
 
     fn destroy(&self, win: Window) {
         let win = win.clone();
-        let i = self.borrow().iter().position(move |w| {
-            w.borrow().win == win.borrow().win
-        }).unwrap();
+        let i = self
+            .borrow()
+            .iter()
+            .position(move |w| w.borrow().win == win.borrow().win)
+            .unwrap();
 
         {
             let v = self.borrow();
@@ -428,9 +425,11 @@ impl WindowsExtend for Windows {
 }
 
 fn run_file_chooser_dialog() -> Option<gio::File> {
-    let dialog = gtk::FileChooserDialog::new::<gtk::Window>(Some("Open File"),
-                                     None,
-                                     gtk::FileChooserAction::Open);
+    let dialog = gtk::FileChooserDialog::new::<gtk::Window>(
+        Some("Open File"),
+        None,
+        gtk::FileChooserAction::Open,
+    );
     dialog.add_button("Cancel", gtk::ResponseType::Cancel.into());
     dialog.add_button("Open", gtk::ResponseType::Accept.into());
 
@@ -449,4 +448,3 @@ fn run_file_chooser_dialog() -> Option<gio::File> {
 
     file
 }
-

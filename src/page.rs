@@ -1,26 +1,16 @@
-extern crate gtk;
-extern crate gio;
-
 use gtk::{
-    ResponseType, LabelExt, TextViewExt,
-    TextBufferExt, NotebookExt, ButtonExt, 
-    WidgetExt, FileChooserExt, DialogExt,
-    ContainerExt, InfoBarExt,
-    RevealerExt, BinExt, Cast
+    BinExt, ButtonExt, Cast, ContainerExt, DialogExt, DialogFlags, FileChooserExt, InfoBarExt,
+    LabelExt, NotebookExt, ResponseType, RevealerExt, TextBufferExt, TextViewExt, WidgetExt,
 };
 
-use gio::{
-    FileExt
-};
+use gio::{FileCreateFlags, FileExt};
 
 use std::cell::RefCell;
-use std::rc::Rc;
 use std::ops::Deref;
 use std::path::Path;
+use std::rc::Rc;
 
-use win::{
-    Window, Windows, WindowExtend, WindowsExtend
-};
+use super::win::{Window, WindowExtend, Windows, WindowsExtend};
 
 pub struct PageCore {
     tab: gtk::Box,
@@ -35,7 +25,7 @@ pub struct PageCore {
 
 impl PageCore {
     pub fn new() -> PageCore {
-        let builder = gtk::Builder::new_from_file(Path::new("/usr/share/vanilla_text/ui/page.ui"));
+        let builder = gtk::Builder::new_from_file(Path::new("ui/page.ui"));
         let tab: gtk::Box = builder.get_object("tab").unwrap();
         let label: gtk::Label = builder.get_object("label").unwrap();
         let close_button: gtk::Button = builder.get_object("close_button").unwrap();
@@ -43,7 +33,12 @@ impl PageCore {
         let contents: gtk::Box = builder.get_object("contents").unwrap();
 
         let revealer: gtk::Revealer = builder.get_object("revealer").unwrap();
-        let info_bar = revealer.get_child().unwrap().downcast::<gtk::InfoBar>().ok().unwrap();
+        let info_bar = revealer
+            .get_child()
+            .unwrap()
+            .downcast::<gtk::InfoBar>()
+            .ok()
+            .unwrap();
 
         {
             let revealer = revealer.clone();
@@ -54,8 +49,17 @@ impl PageCore {
             });
         }
 
-        let scr_win = contents.get_children()[1].clone().downcast::<gtk::ScrolledWindow>().ok().unwrap();
-        let txt_view = scr_win.get_child().unwrap().downcast::<gtk::TextView>().ok().unwrap();
+        let scr_win = contents.get_children()[1]
+            .clone()
+            .downcast::<gtk::ScrolledWindow>()
+            .ok()
+            .unwrap();
+        let txt_view = scr_win
+            .get_child()
+            .unwrap()
+            .downcast::<gtk::TextView>()
+            .ok()
+            .unwrap();
 
         PageCore {
             tab: tab,
@@ -68,9 +72,7 @@ impl PageCore {
             changed: false,
         }
     }
-
 }
-
 
 pub type Page = Rc<RefCell<PageCore>>;
 
@@ -104,7 +106,7 @@ impl PageExtend for Page {
             let wins = wins.clone();
             let win = win.clone();
             page.close_button().connect_clicked(move |_| {
-                if !p.save_confirm(wins.clone(),win.clone()) {
+                if !p.save_confirm(wins.clone(), win.clone()) {
                     win.notebook().detach_tab(&p.contents().clone());
                 }
             });
@@ -112,12 +114,15 @@ impl PageExtend for Page {
 
         {
             let p = page.clone();
-            page.text_view().get_buffer().unwrap().connect_changed(move |_| {
-                if p.changed() {
-                    return;
-                }
-                p.borrow_mut().changed = true;
-            });
+            page.text_view()
+                .get_buffer()
+                .unwrap()
+                .connect_changed(move |_| {
+                    if p.changed() {
+                        return;
+                    }
+                    p.borrow_mut().changed = true;
+                });
         }
 
         page
@@ -175,11 +180,11 @@ impl PageExtend for Page {
 
             let buf = self.borrow().text_view.get_buffer().unwrap();
             buf.set_text(&text);
-            self.tab_label().set_text(file.get_basename().unwrap().to_str().unwrap());
+            self.tab_label()
+                .set_text(file.get_basename().unwrap().to_str().unwrap());
             self.set_file(Some(file.clone()));
             self.set_changed(false);
         }
-
     }
 
     fn save_confirm(&self, wins: Windows, win: Window) -> bool {
@@ -187,11 +192,13 @@ impl PageExtend for Page {
             return false;
         }
 
-        let dialog = gtk::MessageDialog::new(Some(&win.win()),
-                                             gtk::DIALOG_MODAL,
-                                             gtk::MessageType::Warning,
-                                             gtk::ButtonsType::None,
-                                             "Save change before closing?");
+        let dialog = gtk::MessageDialog::new(
+            Some(&win.win()),
+            DialogFlags::MODAL,
+            gtk::MessageType::Warning,
+            gtk::ButtonsType::None,
+            "Save change before closing?",
+        );
         dialog.add_button("Close without saving", ResponseType::Reject.into());
         dialog.add_button("Cancel", ResponseType::Cancel.into());
         dialog.add_button("Save", ResponseType::Accept.into());
@@ -217,7 +224,7 @@ impl PageExtend for Page {
     fn save_file(&self, wins: Windows, win: Window) -> bool {
         if self.file().is_some() {
             self.save_buffer(win.clone());
-            return false
+            return false;
         } else {
             self.save_as(wins.clone(), win.clone())
         }
@@ -227,19 +234,31 @@ impl PageExtend for Page {
         if let Some(buf) = self.text_view().get_buffer() {
             let (start, end) = buf.get_bounds();
             if let Some(text) = buf.get_text(&start, &end, true) {
-                if self.file().as_ref().unwrap().replace_contents(text.as_bytes(),
-                                         None,
-                                         true,
-                                         gio::FILE_CREATE_NONE,
-                                         None).is_ok() {
+                if self
+                    .file()
+                    .as_ref()
+                    .unwrap()
+                    .replace_contents(text.as_bytes(), None, true, FileCreateFlags::NONE, None)
+                    .is_ok()
+                {
                     self.set_changed(false);
-                    self.tab_label().set_text(self.file().as_ref().unwrap().get_basename().unwrap().to_str().unwrap());
+                    self.tab_label().set_text(
+                        self.file()
+                            .as_ref()
+                            .unwrap()
+                            .get_basename()
+                            .unwrap()
+                            .to_str()
+                            .unwrap(),
+                    );
                 } else {
-                    let dialog = gtk::MessageDialog::new(Some(&win.win()),
-                                                         gtk::DIALOG_MODAL,
-                                                         gtk::MessageType::Error,
-                                                         gtk::ButtonsType::Close,
-                                                         "Error: Cannot save file");
+                    let dialog = gtk::MessageDialog::new(
+                        Some(&win.win()),
+                        DialogFlags::MODAL,
+                        gtk::MessageType::Error,
+                        gtk::ButtonsType::Close,
+                        "Error: Cannot save file",
+                    );
                     dialog.run();
                     dialog.destroy();
                 }
@@ -251,14 +270,16 @@ impl PageExtend for Page {
         if let Some(file) = self.save_file_chooser_run(win.clone()) {
             if let Some(p) = wins.get_page(&file) {
                 if p.contents() != self.contents() {
-                    let dialog = gtk::MessageDialog::new(Some(&win.win()),
-                                                         gtk::DIALOG_MODAL,
-                                                         gtk::MessageType::Warning,
-                                                         gtk::ButtonsType::Close,
-                                                         "Error: Cannot save file because another window has been editing the file");
+                    let dialog = gtk::MessageDialog::new(
+                        Some(&win.win()),
+                        DialogFlags::MODAL,
+                        gtk::MessageType::Warning,
+                        gtk::ButtonsType::Close,
+                        "Error: Cannot save file because another window has been editing the file",
+                    );
                     dialog.run();
                     dialog.destroy();
-                    
+
                     return true;
                 }
             }
@@ -273,9 +294,11 @@ impl PageExtend for Page {
     }
 
     fn save_file_chooser_run(&self, win: Window) -> Option<gio::File> {
-        let dialog = gtk::FileChooserDialog::new::<gtk::Window>(Some("Save File"),
-                                                                Some(&win.win().upcast()),
-                                                                gtk::FileChooserAction::Save);
+        let dialog = gtk::FileChooserDialog::new::<gtk::Window>(
+            Some("Save File"),
+            Some(&win.win().upcast()),
+            gtk::FileChooserAction::Save,
+        );
         dialog.add_button("Cancel", ResponseType::Cancel.into());
         dialog.add_button("Save", ResponseType::Accept.into());
         dialog.set_do_overwrite_confirmation(true);
@@ -306,7 +329,6 @@ impl PageExtend for Page {
         self.borrow().revealer.set_reveal_child(true);
     }
 }
-
 
 pub type Pages = Rc<RefCell<Vec<Page>>>;
 
@@ -347,7 +369,7 @@ impl PagesExtend for Pages {
                 }
             }
         }
-        
+
         None
     }
 
@@ -355,4 +377,3 @@ impl PagesExtend for Pages {
         self.borrow_mut().remove(i);
     }
 }
-
